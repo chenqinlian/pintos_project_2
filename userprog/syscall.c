@@ -31,11 +31,15 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_EXIT:
       printf("SYS_EXIT\n");
+      argument_1 = (f->esp)+4;
+      f->eax = *(int *)argument_1;
+      process_exit ();
       break;
     case SYS_EXEC:
       printf("SYS_EXEC\n");
       argument_1 = (f->esp)+4;
       printf("exec function with argument '%s'\n", *(char **)argument_1); 
+      process_execute (*(char **)argument_1);
       break;
     case SYS_WAIT:
       printf("SYS_WAIT\n");
