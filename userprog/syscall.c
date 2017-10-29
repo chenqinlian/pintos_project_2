@@ -13,8 +13,60 @@ syscall_init (void)
 }
 
 static void
-syscall_handler (struct intr_frame *f UNUSED) 
+syscall_handler (struct intr_frame *f) 
 {
-  printf ("system call!\n");
+  int syscall_number;
+  void *argument_1;
+  void *argument_2;
+  void *argument_3;
+  /* Number of arguments that are used depends on syscall number.
+     Max number of arguments is 3. */
+  syscall_number = *(int *)(f->esp);
+ 
+  printf ("system call! syscall number is : %d, ", syscall_number);
+  switch(syscall_number)
+  {
+    case SYS_HALT:
+      printf("SYS_HALT\n");
+      break;
+    case SYS_EXIT:
+      printf("SYS_EXIT\n");
+      break;
+    case SYS_EXEC:
+      printf("SYS_EXEC\n");
+      argument_1 = (f->esp)+4;
+      printf("exec function with argument '%s'\n", *(char **)argument_1); 
+      break;
+    case SYS_WAIT:
+      printf("SYS_WAIT\n");
+      break;
+    case SYS_CREATE:
+      printf("SYS_CREATE\n");
+      break;
+    case SYS_REMOVE:
+      printf("SYS_REMOVE\n");
+      break;
+    case SYS_OPEN:
+      printf("SYS_OPEN\n");
+      break;
+    case SYS_FILESIZE:
+      printf("SYS_FILESIZE\n");
+      break;
+    case SYS_READ:
+      printf("SYS_READ\n");
+      break;
+    case SYS_WRITE:
+      printf("SYS_WRITE\n");
+      break;
+    case SYS_SEEK:
+      printf("SYS_SEEK\n");
+      break;
+    case SYS_TELL:
+      printf("SYS_TELL\n");
+      break;
+    case SYS_CLOSE:
+      printf("SYS_CLOSE\n");
+      break;
+  }
   thread_exit ();
 }
