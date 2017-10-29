@@ -534,6 +534,4 @@ arguments_to_stack (char *file_name, void **esp)
   *(int *)(*esp) = count;
   *esp -= 4;
   *(void **)(*esp) = 0;
-
-  hex_dump (0, *esp, 128, true);
 }
