@@ -7,7 +7,8 @@
    we have to check if semaphore works or not.
    for now, it seems like that it works.*/
 #include "threads/synch.h"
-
+#include "filesys/file.h"
+#include "filesys/inode.h"
 static struct semaphore syscall_sema;
 
 static void syscall_handler (struct intr_frame *);
@@ -39,11 +40,19 @@ syscall_handler (struct intr_frame *f)
   {
     case SYS_HALT:
       printf("SYS_HALT\n");
+      shutdown_power_off ();
       break;
     case SYS_EXIT:
       printf("SYS_EXIT\n");
       argument_1 = (f->esp)+4;
       f->eax = *(int *)argument_1;
+      /* 
+      waits for all of thread_current () 's child processes.
+      it can be implemented with list traversal. */
+      /*
+      search thread_current () from (parent_thread -> child_list) 
+      and modify the exit status. because parent needs it. 
+      maybe parent_thread's semaphore up. */
       process_exit ();
       sema_up (&syscall_sema);
       return;
@@ -58,6 +67,15 @@ syscall_handler (struct intr_frame *f)
       break;
     case SYS_WAIT:
       printf("SYS_WAIT\n");
+      /*  if input tid is not child, return -1
+          if already waited tid, return -1
+          if already exited tid, return -1 *
+      /*  PINTOS : A THREAD PER PROCESS 
+          we can treat a thread as a process.
+          so we can add a semaphore that makes it wait in thread's struct 
+          initialize it in thread_init, and we can sema_down () for wait.
+          in here, sema_down (thread_sema)
+          and we can make sema_up whenever the child process exits. */
       break;
     case SYS_CREATE:
       printf("SYS_CREATE\n");
