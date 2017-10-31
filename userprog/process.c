@@ -150,6 +150,8 @@ process_exit (void)
   /* change values in parent's list. */
   struct child_process_status *cps;
   struct list_elem *e;
+  if(exit_status!=-1)
+    printf("%s: exit(%d)\n", cur->name, exit_status);
   if(is_thread_ext (parent) && parent->status != THREAD_DYING)
   {
     for (e = list_begin (&(parent->child_process_status_list)); e != list_end (&(parent->child_process_status_list)); e = list_next (e))

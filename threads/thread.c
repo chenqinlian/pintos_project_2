@@ -502,7 +502,7 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->child_process_status_list);
   sema_init (&t->wait_sema, 0);
   t->wait_tid = 0;
-  t->exit_status = 0;
+  t->exit_status = -1;
   #endif
 }
 

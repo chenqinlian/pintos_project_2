@@ -46,7 +46,6 @@ syscall_handler (struct intr_frame *f)
       //printf("SYS_EXIT\n");
       argument_1 = (f->esp)+4;
       f->eax = *(int *)argument_1;
-      printf("%s: exit(%d)\n", thread_current ()->name, *(int *)argument_1);
       thread_current () -> exit_status = *(int *)argument_1;
      // sema_up (&syscall_sema);
       thread_exit ();
