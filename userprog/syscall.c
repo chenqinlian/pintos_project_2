@@ -35,7 +35,7 @@ syscall_handler (struct intr_frame *f)
      we have to sema_up if the handler returns in the switch case
      (maybe later we make all syscalls, we may need only one sema_up in the last*/
   //sema_down (&syscall_sema);
-  //printf ("system call! syscall number is : %d, ", syscall_number);
+  //printf ("system call! syscall number is : %d\n", syscall_number);
   switch(syscall_number)
   {
     case SYS_HALT:

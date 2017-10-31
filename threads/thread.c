@@ -201,6 +201,7 @@ thread_create (const char *name, int priority,
   cps -> waited = false;
   cps -> exit_status = 0;
   cps -> thread_ptr = t;
+  list_push_back(&(thread_current ()->child_process_status_list), &(cps->elem));
   #endif
 
   /* Prepare thread for first run by initializing its stack.
