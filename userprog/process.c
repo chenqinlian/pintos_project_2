@@ -147,7 +147,6 @@ process_exit (void)
   uint32_t *pd;
   int exit_status = cur -> exit_status;
   tid_t tid = cur -> tid;
- printf("name is %s\n", cur->name); 
   /* change values in parent's list. */
   struct child_process_status *cps;
   struct list_elem *e;
@@ -179,12 +178,14 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-  
-  if(tid == parent->wait_tid)
+  if(is_thread_ext(parent) && parent->status != THREAD_DYING)
   {
-    parent->wait_tid = 0;
-    sema_up(&(parent->wait_sema));
-  }
+    if(tid == parent->wait_tid)
+    {
+      parent->wait_tid = 0;
+      sema_up(&(parent->wait_sema));
+    }
+  }  
 }
 
 /* Sets up the CPU for running user code in the current
