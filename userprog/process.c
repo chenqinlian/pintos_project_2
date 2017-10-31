@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "userprog/syscall.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -149,6 +150,7 @@ process_exit (void)
   tid_t tid = cur -> tid;
   /* change values in parent's list. */
   struct child_process_status *cps;
+  struct fd_element *fd_elem;
   struct list_elem *e;
   if(exit_status!=-1)
     printf("%s: exit(%d)\n", cur->name, exit_status);
@@ -163,6 +165,18 @@ process_exit (void)
         cps->exit_status = exit_status;
       }
     }
+  }
+  for (e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next (e))
+  {
+    cps = list_entry (list_prev (e), struct child_process_status, elem);
+    if(cps != NULL)
+      palloc_free_page (cps);
+  }
+  for (e = list_begin (&(cur->fd_table)); e != list_end (&(cur->fd_table)); e = list_next (e))
+  {
+    fd_elem = list_entry (list_prev (e), struct fd_element, elem);
+    if(fd_elem != NULL)
+      palloc_free_page (fd_elem);
   }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */

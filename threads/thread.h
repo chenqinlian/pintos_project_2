@@ -104,6 +104,10 @@ struct thread
     tid_t wait_tid;
     struct semaphore wait_sema;         /* two will used for wait () */
     int exit_status;                    /* temp value for process_exit () */
+
+    /* file descriptors */
+    struct list fd_table;               /* fd table for process. */
+    int next_fd;                        /* next fd to allocate. init value is 2 */
   #endif
 
     /* Owned by thread.c. */

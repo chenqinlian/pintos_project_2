@@ -8,10 +8,14 @@
    for now, it seems like that it works.*/
 #include "threads/synch.h"
 #include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "filesys/inode.h"
-//static struct semaphore syscall_sema;
+#include "threads/vaddr.h"
+#include "threads/palloc.h"
 
 static void syscall_handler (struct intr_frame *);
+int file_to_new_fd (struct file *file);
+struct fd_element* fd_to_fd_element (int fd);
 
 void
 syscall_init (void) 
@@ -20,6 +24,43 @@ syscall_init (void)
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
+static int
+get_user (const uint8_t *uaddr)
+{
+  int result;
+  asm ("movl $1f, %0; movzbl %1, %0; 1:"
+       : "=&a" (result) : "m" (*uaddr));
+  return result;
+}
+
+static bool
+put_user (uint8_t *udst, uint8_t byte)
+{
+  int error_code;
+  asm ("movl $1f, %0; movb %b2, %1, 1:"
+       : "=&a" (error_code), "=m" (*udst) : "q" (byte));
+  return error_code != -1;
+}
+
+/* Returns true if the given string is valid in two ways:
+   1. no page fault
+   2. the string's content does not exceed the PHYS_BASE (user address) */
+static bool
+is_valid_string (const char *uaddr)
+{
+  char ch;
+  int i;
+  if (!is_user_vaddr(uaddr))
+    return false;
+  for(i = 0; (ch = get_user((char *)(uaddr + i))) != -1 && ch != 0; i++)
+  {
+    if(!is_user_vaddr(uaddr + i + 1))
+      return false;
+  }
+  return ch == 0;
+}
+
+
 static void
 syscall_handler (struct intr_frame *f) 
 {
@@ -27,6 +68,8 @@ syscall_handler (struct intr_frame *f)
   void *argument_1;
   void *argument_2;
   void *argument_3;
+  struct fd_element *fd_elem;
+  struct file *file;
   /* Number of arguments that are used depends on syscall number.
      Max number of arguments is 3. */
   
@@ -41,52 +84,99 @@ syscall_handler (struct intr_frame *f)
     case SYS_HALT:
      // printf("SYS_HALT\n");
       shutdown_power_off ();
-      break;
+      return;
     case SYS_EXIT:
       //printf("SYS_EXIT\n");
       argument_1 = (f->esp)+4;
-      f->eax = *(int *)argument_1;
+      //f->eax = *(int *)argument_1;
       thread_current () -> exit_status = *(int *)argument_1;
      // sema_up (&syscall_sema);
       thread_exit ();
-      break;
+      return;
     case SYS_EXEC:
       //printf("SYS_EXEC\n");
       argument_1 = (f->esp)+4;
-      //printf("exec function with argument '%s'\n", *(char **)argument_1); 
+      if(!is_valid_string(argument_1))
+        thread_exit ();
       f->eax = process_execute (*(char **)argument_1);
      // sema_up (&syscall_sema);
       return;
-      break;
     case SYS_WAIT:
       argument_1 = (f->esp)+4;
       f->eax = process_wait (*(tid_t *) argument_1); 
       return;
-      break;
     case SYS_CREATE:
       //printf("SYS_CREATE\n");
-      break;
+      argument_1 = (f->esp)+4;
+      argument_2 = (f->esp)+8; 
+      if(!is_valid_string(argument_1))
+        thread_exit ();
+      f->eax = filesys_create(*(char **)argument_1, *(off_t *)argument_2); 
+      return;
     case SYS_REMOVE:
      // printf("SYS_REMOVE\n");
-      break;
+      if(!is_valid_string(argument_1))
+        thread_exit ();
+      f->eax = filesys_remove (*(char **)argument_1);
+      return;
     case SYS_OPEN:
+      argument_1 = (f->esp)+4;
+      if(!is_valid_string(argument_1))
+        thread_exit ();
+      file = filesys_open (*(char **)argument_1);
+      if(file != NULL)
+        f->eax = file_to_new_fd (file);
+      else
+        f->eax = -1;
+      return;
      // printf("SYS_OPEN\n");
-      break;
     case SYS_FILESIZE:
+      argument_1 = (f->esp)+4;
+      fd_elem = fd_to_fd_element (*(int *)argument_1);
+      if(fd_elem == NULL)
+      {
+        f->eax = -1;
+        return;
+      }
+      file = fd_elem->file;
+      f->eax = file_length (file);
+      return;
       //printf("SYS_FILESIZE\n");
-      break;
     case SYS_READ:
      // printf("SYS_READ\n");
-      break;
+      argument_1 = (f->esp)+4;
+      argument_2 = (f->esp)+8;
+      argument_3 = (f->esp)+12;
+      if (*(int *)argument_1 == STDIN_FILENO)
+      {
+        input_getc();
+        f->eax = 1;
+        return;
+      }
+      fd_elem = fd_to_fd_element (*(int *)argument_1);
+      if(fd_elem == NULL)
+      {
+        f->eax = -1;
+        return;
+      }
+      file = fd_elem -> file;
+      if(file == NULL)
+      {
+        f->eax = -1;
+        return;
+      }
+      f->eax = file_read (file, *(void **)argument_2, *(off_t *)argument_3);
+      return;
     case SYS_WRITE:
      // printf("SYS_WRITE\n");
       argument_1 = (f->esp)+4;
       argument_2 = (f->esp)+8;
       argument_3 = (f->esp)+12;
-      if(*(int *)argument_1 == 1)
+      if(*(int *)argument_1 == STDOUT_FILENO)
       {
       /* Fd 1 writes to the console. 
          breaks down the buffer by 256 bytes.*/
+        f->eax = 0;
         while(*(size_t *)argument_3 > 256)
         {
             putbuf (*(char **)argument_2, 256);
@@ -94,18 +184,64 @@ syscall_handler (struct intr_frame *f)
             *(size_t *)argument_3 -= 256;
         }
         putbuf (*(char **)argument_2, *(size_t *)argument_3);
-      //sema_up (&syscall_sema);i
-        return;
       }
-      break;
+      else
+      {
+        fd_elem = fd_to_fd_element (*(int *)argument_1);
+        if (fd_elem == NULL)
+        {
+          f->eax = -1;
+          return;
+        }
+        file = fd_elem -> file;
+        if (file == NULL)
+        {
+          f->eax = -1;
+          return;
+        }
+        f->eax = file_write (file, *(void **)argument_2, *(off_t *)argument_3); 
+      }
+      return;
     case SYS_SEEK:
      // printf("SYS_SEEK\n");
-      break;
+      argument_1 = (f->esp)+4;
+      argument_2 = (f->esp)+8;
+      
+      fd_elem = fd_to_fd_element (*(int *)argument_1);
+      if(fd_elem == NULL)
+        return;
+      file = fd_elem -> file;
+      if(file == NULL)
+        return;
+      file_seek (file, *(off_t *)argument_2);
+      return;
     case SYS_TELL:
      // printf("SYS_TELL\n");
-      break;
+      fd_elem = fd_to_fd_element (*(int *)argument_1);
+      if(fd_elem == NULL)
+      {
+        f->eax = -1;
+        return;
+      }
+      file = fd_elem->file;
+      if(file == NULL)
+      {
+        f->eax = -1;
+        return;
+      }
+      f->eax = file_tell (file);
+      return;
     case SYS_CLOSE:
      // printf("SYS_CLOSE\n");
+      argument_1 = (f->esp)+4;
+      struct fd_element* fd_elem = fd_to_fd_element (*(int *)argument_1);
+      if(fd_elem != NULL)
+      {
+        file_close (fd_elem->file);
+        list_remove (&fd_elem->elem);
+        palloc_free_page (fd_elem);
+      }
+      return;
       break;
   }
   /* treat all syscall region as a critical section */
@@ -113,3 +249,34 @@ syscall_handler (struct intr_frame *f)
   thread_exit ();
 }
 
+int
+file_to_new_fd (struct file* file)
+{
+  struct thread *cur = thread_current ();
+  struct fd_element *fd_elem;
+  fd_elem = palloc_get_page (PAL_ZERO);
+  if(fd_elem == NULL)
+    return -1;
+  fd_elem->file = file;
+  fd_elem->fd = cur->next_fd;
+  cur->next_fd += 1;
+  return fd_elem->fd;
+}
+
+struct fd_element*
+fd_to_fd_element (int fd)
+{
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+  struct fd_element *fd_elem;
+
+  for(e = list_begin (&(cur->fd_table)); e != list_end (&(cur->fd_table)); e = list_next (e))
+  {
+    fd_elem = list_entry (e, struct fd_element, elem);
+    if (fd_elem -> fd == fd)
+    {
+      return fd_elem;
+    }
+  }
+  return NULL;
+}
