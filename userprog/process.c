@@ -33,23 +33,36 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-  char *token, *save_ptr;
+  char *save_ptr;
+  struct list_elem *e;
+  struct thread *cur;
+  struct child_process_status *cps;
+  cur = thread_current ();
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
-  printf("process_execute () runs with '%s' as an argument\n", file_name);
+  //printf("process_execute () runs with '%s' as an argument\n", file_name);
   fn_copy = palloc_get_page (0);
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, file_name, PGSIZE);
   /* Tokenize file_name to get process name */
-  token = strtok_r (file_name, " ", &save_ptr);
+  file_name = strtok_r (file_name, " ", &save_ptr);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
   if (tid == TID_ERROR)
     palloc_free_page (fn_copy); 
-  /* wait for the process ends */
   else
-    process_wait (tid);
+  {
+    for (e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next(e))
+    {
+      cps = list_entry(e, struct child_process_status, elem);
+      if(cps->tid == tid)
+      {
+        cps->thread_ptr->parent_thread = cur;
+        break;
+      }
+    }
+  }
   return tid;
 }
 
@@ -97,9 +110,31 @@ start_process (void *file_name_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid) 
 {
-  while (1);
+  struct child_process_status *cps;
+  struct thread *cur = thread_current ();
+  struct list_elem *e;
+ 
+  for(e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next (e))
+  {
+    cps = list_entry (e, struct child_process_status, elem);
+    if(cps->tid == child_tid)
+    {
+      if(cps->exited || cps->waited)
+      {
+        cps->waited = true;
+        return -1;
+      }
+      else
+      {
+        cur->wait_tid = child_tid;
+        sema_down (&(cur->wait_sema));
+        cps->waited=true;
+        return cps->exit_status;
+      }
+    }
+  }
   return -1;
 }
 
@@ -108,8 +143,26 @@ void
 process_exit (void)
 {
   struct thread *cur = thread_current ();
+  struct thread *parent = cur -> parent_thread;
   uint32_t *pd;
-
+  int exit_status = cur -> exit_status;
+  tid_t tid = cur -> tid;
+ printf("name is %s\n", cur->name); 
+  /* change values in parent's list. */
+  struct child_process_status *cps;
+  struct list_elem *e;
+  if(is_thread_ext (parent) && parent->status != THREAD_DYING)
+  {
+    for (e = list_begin (&(parent->child_process_status_list)); e != list_end (&(parent->child_process_status_list)); e = list_next (e))
+    {
+      cps = list_entry (e, struct child_process_status, elem);
+      if(cps->tid == cur->tid)
+      {
+        cps->exited = true;
+        cps->exit_status = exit_status;
+      }
+    }
+  }
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -126,6 +179,12 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  
+  if(tid == parent->wait_tid)
+  {
+    parent->wait_tid = 0;
+    sema_up(&(parent->wait_sema));
+  }
 }
 
 /* Sets up the CPU for running user code in the current
@@ -233,7 +292,7 @@ load (const char *file_name_, void (**eip) (void), void **esp)
   if(file_name == 0)
     thread_exit ();
   strlcpy (file_name, file_name_, PGSIZE);
-  char *token, *save_ptr;
+  char *save_ptr;
   file_name = strtok_r(file_name, " ", &save_ptr);
 
   /* Allocate and activate page directory. */
