@@ -72,7 +72,8 @@ syscall_handler (struct intr_frame *f)
   struct file *file;
   /* Number of arguments that are used depends on syscall number.
      Max number of arguments is 3. */
-  if(!is_user_vaddr ((f->esp)))
+  if(!is_user_vaddr ((f->esp))
+     || get_user(f->esp) == -1)
   {
     thread_exit ();
   }
