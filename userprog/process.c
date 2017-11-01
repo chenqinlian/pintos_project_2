@@ -82,10 +82,13 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  
 
   /* If load success, pass arguments. */
   if (success)
+  {
     arguments_to_stack (file_name, &if_.esp);
+  }
   /* If load failed, quit. */
   palloc_free_page (file_name);
   if (!success) 
@@ -152,8 +155,7 @@ process_exit (void)
   struct child_process_status *cps;
   struct fd_element *fd_elem;
   struct list_elem *e;
-  if(exit_status!=-1)
-    printf("%s: exit(%d)\n", cur->name, exit_status);
+  printf("%s: exit(%d)\n", cur->name, exit_status);
   if(is_thread_ext (parent) && parent->status != THREAD_DYING)
   {
     for (e = list_begin (&(parent->child_process_status_list)); e != list_end (&(parent->child_process_status_list)); e = list_next (e))
@@ -201,7 +203,8 @@ process_exit (void)
       parent->wait_tid = 0;
       sema_up(&(parent->wait_sema));
     }
-  }  
+  }
+  file_deny_write (cur -> executing_file);  
 }
 
 /* Sets up the CPU for running user code in the current
@@ -404,7 +407,8 @@ load (const char *file_name_, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
-
+  thread_current () -> executing_file = file;
+  file_deny_write (file);
   success = true;
 
  done:

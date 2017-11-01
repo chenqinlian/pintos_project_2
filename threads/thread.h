@@ -108,7 +108,9 @@ struct thread
     /* file descriptors */
     struct list fd_table;               /* fd table for process. */
     int next_fd;                        /* next fd to allocate. init value is 2 */
+    struct file* executing_file;        /* to deny and allow write executing file */
   #endif
+
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
