@@ -22,6 +22,7 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+
 /* arguments parsing and passing to process */
 void arguments_to_stack (char *file_name, void **esp);
 /* Starts a new thread running a user program loaded from
@@ -34,7 +35,7 @@ process_execute (const char *file_name)
 {
   char *fn_copy;
   tid_t tid;
-  char *save_ptr;
+  char *save_ptr=NULL;
   struct list_elem *e;
   struct thread *cur;
   struct child_process_status *cps;
@@ -60,10 +61,14 @@ process_execute (const char *file_name)
       if(cps->tid == tid)
       {
         cps->thread_ptr->parent_thread = cur;
+        sema_up(&(cps->thread_ptr->parent_sema));
         break;
       }
     }
   }
+  sema_down(&(cur->exec_sema));
+  if(!cur->exec_child_success)
+    return TID_ERROR;
   return tid;
 }
 
@@ -82,8 +87,9 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
-  
-
+  sema_down (&(thread_current () -> parent_sema));
+  thread_current () -> parent_thread -> exec_child_success = success;
+  sema_up (&(thread_current () -> parent_thread -> exec_sema));
   /* If load success, pass arguments. */
   if (success)
   {
@@ -125,10 +131,12 @@ process_wait (tid_t child_tid)
     cps = list_entry (e, struct child_process_status, elem);
     if(cps->tid == child_tid)
     {
-      if(cps->exited || cps->waited)
+      if(cps->waited)
+        return -1;
+      if(cps->exited)
       {
         cps->waited = true;
-        return -1;
+        return cps->exit_status;
       }
       else
       {
@@ -153,7 +161,6 @@ process_exit (void)
   tid_t tid = cur -> tid;
   /* change values in parent's list. */
   struct child_process_status *cps;
-  struct fd_element *fd_elem;
   struct list_elem *e;
   printf("%s: exit(%d)\n", cur->name, exit_status);
   if(is_thread_ext (parent) && parent->status != THREAD_DYING)
@@ -328,7 +335,7 @@ load (const char *file_name_, void (**eip) (void), void **esp)
   if(file_name == 0)
     thread_exit ();
   strlcpy (file_name, file_name_, PGSIZE);
-  char *save_ptr;
+  char *save_ptr=NULL;
   file_name = strtok_r(file_name, " ", &save_ptr);
 
   /* Allocate and activate page directory. */
@@ -586,7 +593,7 @@ install_page (void *upage, void *kpage, bool writable)
 void
 arguments_to_stack (char *file_name, void **esp)
 {
-  char *token, *save_ptr;
+  char *token, *save_ptr=NULL;
   int count;
   int iter;
   int str_len;

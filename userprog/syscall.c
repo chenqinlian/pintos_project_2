@@ -16,7 +16,7 @@
 static void syscall_handler (struct intr_frame *);
 int file_to_new_fd (struct file *file);
 struct fd_element* fd_to_fd_element (int fd);
-static struct semaphore sys_sema;
+struct semaphore sys_sema;
 void
 syscall_init (void) 
 {
@@ -72,13 +72,15 @@ syscall_handler (struct intr_frame *f)
   struct file *file;
   /* Number of arguments that are used depends on syscall number.
      Max number of arguments is 3. */
-  if((!is_user_vaddr ((f->esp))))
+  if(!is_user_vaddr ((f->esp)))
   {
     thread_exit ();
   }
   syscall_number = *(int *)(f->esp);
-  if(syscall_number == SYS_EXEC || (syscall_number >= SYS_CREATE && syscall_number <=SYS_CLOSE))
+  if(syscall_number >= SYS_CREATE && syscall_number <=SYS_CLOSE)
     sema_down (&sys_sema);
+  if(syscall_number < 0 || syscall_number > 20)
+    thread_exit ();
   /* treat all syscall region as a critical section 
      we have to sema_up if the handler returns in the switch case
      (maybe later we make all syscalls, we may need only one sema_up in the last*/
@@ -107,17 +109,23 @@ syscall_handler (struct intr_frame *f)
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
       {
-        sema_up (&sys_sema);
         thread_exit ();
       }
       if(!is_valid_string(*(char **)argument_1))
       {
-        sema_up (&sys_sema);
         thread_exit ();
       }
-      f->eax = process_execute (*(char **)argument_1);
+      char *fn_copy;
+      fn_copy = palloc_get_page (0);
+      if(fn_copy == NULL)
+      {
+        f->eax = TID_ERROR;
+        return;
+      }
+      strlcpy (fn_copy, *(char **)argument_1, PGSIZE);
+      f->eax = process_execute (fn_copy);
+      palloc_free_page(fn_copy);
      // sema_up (&syscall_sema);
-      sema_up (&sys_sema);
       return;
     case SYS_WAIT:
       argument_1 = (f->esp)+4;
@@ -230,6 +238,11 @@ syscall_handler (struct intr_frame *f)
         sema_up (&sys_sema);
         return;
       }
+      if(!is_user_vaddr(*(uint8_t **)argument_2 + *(off_t *)argument_3))
+      {
+        sema_up (&sys_sema);
+        thread_exit ();
+      }
       f->eax = file_read (file, *(void **)argument_2, *(off_t *)argument_3);
       sema_up (&sys_sema);
       return;
@@ -238,7 +251,9 @@ syscall_handler (struct intr_frame *f)
       argument_1 = (f->esp)+4;
       argument_2 = (f->esp)+8;
       argument_3 = (f->esp)+12;
-      if(!is_user_vaddr ((f->esp)+12))
+      if(!is_user_vaddr ((f->esp)+12)||
+         !is_user_vaddr(*(uint8_t **)argument_2 + *(off_t *)argument_3) ||
+         get_user((*(uint8_t **)argument_2)) == -1)
       {
         sema_up (&sys_sema);
         thread_exit ();

@@ -506,6 +506,8 @@ init_thread (struct thread *t, const char *name, int priority)
   list_init (&t->fd_table);
   t->next_fd = 2;
   t->executing_file = NULL;
+  sema_init (&t->exec_sema, 0);
+  sema_init (&t->parent_sema, 0);
   #endif
 }
 
