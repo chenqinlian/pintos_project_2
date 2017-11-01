@@ -1,5 +1,8 @@
 cd build && make check
 make[1]: Entering directory `/home/os/pintos/src/userprog/build'
+gcc -c ../../userprog/process.c -o userprog/process.o -g -msoft-float -O -fno-stack-protector -nostdinc -I../.. -I../../lib -I../../lib/kernel -Wall -W -Wstrict-prototypes -Wmissing-prototypes -Wsystem-headers -DUSERPROG -DFILESYS -MMD -MF userprog/process.d
+ld -T threads/kernel.lds.s -o kernel.o threads/start.o threads/init.o threads/thread.o threads/switch.o threads/interrupt.o threads/intr-stubs.o threads/synch.o threads/palloc.o threads/malloc.o devices/pit.o devices/timer.o devices/kbd.o devices/vga.o devices/serial.o devices/block.o devices/partition.o devices/ide.o devices/input.o devices/intq.o devices/rtc.o devices/shutdown.o devices/speaker.o lib/debug.o lib/random.o lib/stdio.o lib/stdlib.o lib/string.o lib/arithmetic.o lib/ustar.o lib/kernel/debug.o lib/kernel/list.o lib/kernel/bitmap.o lib/kernel/hash.o lib/kernel/console.o userprog/process.o userprog/pagedir.o userprog/exception.o userprog/syscall.o userprog/gdt.o userprog/tss.o filesys/filesys.o filesys/free-map.o filesys/file.o filesys/directory.o filesys/inode.o filesys/fsutil.o
+objcopy -R .note -R .comment -S kernel.o kernel.bin
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/args-none -a args-none -- -q  -f run args-none < /dev/null 2> tests/userprog/args-none.errors > tests/userprog/args-none.output
 perl -I../.. ../../tests/userprog/args-none.ck tests/userprog/args-none tests/userprog/args-none.result
 pass tests/userprog/args-none
@@ -18,7 +21,7 @@ pass tests/userprog/args-dbl-space
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/sc-bad-sp -a sc-bad-sp -- -q  -f run sc-bad-sp < /dev/null 2> tests/userprog/sc-bad-sp.errors > tests/userprog/sc-bad-sp.output
 perl -I../.. ../../tests/userprog/sc-bad-sp.ck tests/userprog/sc-bad-sp tests/userprog/sc-bad-sp.result
 FAIL tests/userprog/sc-bad-sp
-run: TIMEOUT after 6 seconds of wall-clock time - load average: 1.22, 1.31, 1.33
+run: TIMEOUT after 5 seconds of host CPU time
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/sc-bad-arg -a sc-bad-arg -- -q  -f run sc-bad-arg < /dev/null 2> tests/userprog/sc-bad-arg.errors > tests/userprog/sc-bad-arg.output
 perl -I../.. ../../tests/userprog/sc-bad-arg.ck tests/userprog/sc-bad-arg tests/userprog/sc-bad-arg.result
 pass tests/userprog/sc-bad-arg
@@ -96,8 +99,7 @@ perl -I../.. ../../tests/userprog/read-normal.ck tests/userprog/read-normal test
 pass tests/userprog/read-normal
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/read-bad-ptr -a read-bad-ptr -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run read-bad-ptr < /dev/null 2> tests/userprog/read-bad-ptr.errors > tests/userprog/read-bad-ptr.output
 perl -I../.. ../../tests/userprog/read-bad-ptr.ck tests/userprog/read-bad-ptr tests/userprog/read-bad-ptr.result
-FAIL tests/userprog/read-bad-ptr
-run: should not have survived read(): FAILED
+pass tests/userprog/read-bad-ptr
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/read-boundary -a read-boundary -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run read-boundary < /dev/null 2> tests/userprog/read-boundary.errors > tests/userprog/read-boundary.output
 perl -I../.. ../../tests/userprog/read-boundary.ck tests/userprog/read-boundary tests/userprog/read-boundary.result
 pass tests/userprog/read-boundary
@@ -115,8 +117,7 @@ perl -I../.. ../../tests/userprog/write-normal.ck tests/userprog/write-normal te
 pass tests/userprog/write-normal
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/write-bad-ptr -a write-bad-ptr -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run write-bad-ptr < /dev/null 2> tests/userprog/write-bad-ptr.errors > tests/userprog/write-bad-ptr.output
 perl -I../.. ../../tests/userprog/write-bad-ptr.ck tests/userprog/write-bad-ptr tests/userprog/write-bad-ptr.result
-FAIL tests/userprog/write-bad-ptr
-run: TIMEOUT after 11 seconds of wall-clock time - load average: 2.10, 1.55, 1.41
+pass tests/userprog/write-bad-ptr
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/write-boundary -a write-boundary -p ../../tests/userprog/sample.txt -a sample.txt -- -q  -f run write-boundary < /dev/null 2> tests/userprog/write-boundary.errors > tests/userprog/write-boundary.output
 perl -I../.. ../../tests/userprog/write-boundary.ck tests/userprog/write-boundary tests/userprog/write-boundary.result
 pass tests/userprog/write-boundary
@@ -134,8 +135,7 @@ perl -I../.. ../../tests/userprog/exec-once.ck tests/userprog/exec-once tests/us
 pass tests/userprog/exec-once
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/exec-arg -a exec-arg -p tests/userprog/child-args -a child-args -- -q  -f run exec-arg < /dev/null 2> tests/userprog/exec-arg.errors > tests/userprog/exec-arg.output
 perl -I../.. ../../tests/userprog/exec-arg.ck tests/userprog/exec-arg tests/userprog/exec-arg.result
-FAIL tests/userprog/exec-arg
-run: TIMEOUT after 11 seconds of wall-clock time - load average: 2.22, 1.61, 1.43
+pass tests/userprog/exec-arg
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/exec-multiple -a exec-multiple -p tests/userprog/child-simple -a child-simple -- -q  -f run exec-multiple < /dev/null 2> tests/userprog/exec-multiple.errors > tests/userprog/exec-multiple.output
 perl -I../.. ../../tests/userprog/exec-multiple.ck tests/userprog/exec-multiple tests/userprog/exec-multiple.result
 pass tests/userprog/exec-multiple
@@ -233,12 +233,11 @@ perl -I../.. ../../tests/userprog/rox-simple.ck tests/userprog/rox-simple tests/
 pass tests/userprog/rox-simple
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/rox-child -a rox-child -p tests/userprog/child-rox -a child-rox -- -q  -f run rox-child < /dev/null 2> tests/userprog/rox-child.errors > tests/userprog/rox-child.output
 perl -I../.. ../../tests/userprog/rox-child.ck tests/userprog/rox-child tests/userprog/rox-child.result
-FAIL tests/userprog/rox-child
-run: TIMEOUT after 5 seconds of host CPU time
+pass tests/userprog/rox-child
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/rox-multichild -a rox-multichild -p tests/userprog/child-rox -a child-rox -- -q  -f run rox-multichild < /dev/null 2> tests/userprog/rox-multichild.errors > tests/userprog/rox-multichild.output
 perl -I../.. ../../tests/userprog/rox-multichild.ck tests/userprog/rox-multichild tests/userprog/rox-multichild.result
 FAIL tests/userprog/rox-multichild
-run: TIMEOUT after 5 seconds of host CPU time
+run: wait for "child-rox": FAILED
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/userprog/bad-read -a bad-read -- -q  -f run bad-read < /dev/null 2> tests/userprog/bad-read.errors > tests/userprog/bad-read.output
 perl -I../.. ../../tests/userprog/bad-read.ck tests/userprog/bad-read tests/userprog/bad-read.result
 pass tests/userprog/bad-read
@@ -269,13 +268,81 @@ perl -I../.. ../../tests/filesys/base/lg-full.ck tests/filesys/base/lg-full test
 pass tests/filesys/base/lg-full
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/filesys/base/lg-random -a lg-random -- -q  -f run lg-random < /dev/null 2> tests/filesys/base/lg-random.errors > tests/filesys/base/lg-random.output
 perl -I../.. ../../tests/filesys/base/lg-random.ck tests/filesys/base/lg-random tests/filesys/base/lg-random.result
-pass tests/filesys/base/lg-random
+FAIL tests/filesys/base/lg-random
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (lg-random) begin
+  (lg-random) create "bazzle"
+  (lg-random) open "bazzle"
+  (lg-random) write "bazzle" in random order
+  (lg-random) read "bazzle" in random order
+  (lg-random) close "bazzle"
+  (lg-random) end
+Differences in `diff -u' format:
+  (lg-random) begin
+  (lg-random) create "bazzle"
+  (lg-random) open "bazzle"
+  (lg-random) write "bazzle" in random order
+- (lg-random) read "bazzle" in random order
+- (lg-random) close "bazzle"
+- (lg-random) end
+
+(Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/filesys/base/lg-seq-block -a lg-seq-block -- -q  -f run lg-seq-block < /dev/null 2> tests/filesys/base/lg-seq-block.errors > tests/filesys/base/lg-seq-block.output
 perl -I../.. ../../tests/filesys/base/lg-seq-block.ck tests/filesys/base/lg-seq-block tests/filesys/base/lg-seq-block.result
-pass tests/filesys/base/lg-seq-block
+FAIL tests/filesys/base/lg-seq-block
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (lg-seq-block) begin
+  (lg-seq-block) create "noodle"
+  (lg-seq-block) open "noodle"
+  (lg-seq-block) writing "noodle"
+  (lg-seq-block) close "noodle"
+  (lg-seq-block) open "noodle" for verification
+  (lg-seq-block) verified contents of "noodle"
+  (lg-seq-block) close "noodle"
+  (lg-seq-block) end
+Differences in `diff -u' format:
+  (lg-seq-block) begin
+  (lg-seq-block) create "noodle"
+  (lg-seq-block) open "noodle"
+  (lg-seq-block) writing "noodle"
+- (lg-seq-block) close "noodle"
+- (lg-seq-block) open "noodle" for verification
+- (lg-seq-block) verified contents of "noodle"
+- (lg-seq-block) close "noodle"
+- (lg-seq-block) end
+
+(Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/filesys/base/lg-seq-random -a lg-seq-random -- -q  -f run lg-seq-random < /dev/null 2> tests/filesys/base/lg-seq-random.errors > tests/filesys/base/lg-seq-random.output
 perl -I../.. ../../tests/filesys/base/lg-seq-random.ck tests/filesys/base/lg-seq-random tests/filesys/base/lg-seq-random.result
-pass tests/filesys/base/lg-seq-random
+FAIL tests/filesys/base/lg-seq-random
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (lg-seq-random) begin
+  (lg-seq-random) create "nibble"
+  (lg-seq-random) open "nibble"
+  (lg-seq-random) writing "nibble"
+  (lg-seq-random) close "nibble"
+  (lg-seq-random) open "nibble" for verification
+  (lg-seq-random) verified contents of "nibble"
+  (lg-seq-random) close "nibble"
+  (lg-seq-random) end
+Differences in `diff -u' format:
+  (lg-seq-random) begin
+  (lg-seq-random) create "nibble"
+  (lg-seq-random) open "nibble"
+  (lg-seq-random) writing "nibble"
+- (lg-seq-random) close "nibble"
+- (lg-seq-random) open "nibble" for verification
+- (lg-seq-random) verified contents of "nibble"
+- (lg-seq-random) close "nibble"
+- (lg-seq-random) end
+
+(Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/filesys/base/sm-create -a sm-create -- -q  -f run sm-create < /dev/null 2> tests/filesys/base/sm-create.errors > tests/filesys/base/sm-create.output
 perl -I../.. ../../tests/filesys/base/sm-create.ck tests/filesys/base/sm-create tests/filesys/base/sm-create.result
 pass tests/filesys/base/sm-create
@@ -284,13 +351,81 @@ perl -I../.. ../../tests/filesys/base/sm-full.ck tests/filesys/base/sm-full test
 pass tests/filesys/base/sm-full
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/filesys/base/sm-random -a sm-random -- -q  -f run sm-random < /dev/null 2> tests/filesys/base/sm-random.errors > tests/filesys/base/sm-random.output
 perl -I../.. ../../tests/filesys/base/sm-random.ck tests/filesys/base/sm-random tests/filesys/base/sm-random.result
-pass tests/filesys/base/sm-random
+FAIL tests/filesys/base/sm-random
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (sm-random) begin
+  (sm-random) create "bazzle"
+  (sm-random) open "bazzle"
+  (sm-random) write "bazzle" in random order
+  (sm-random) read "bazzle" in random order
+  (sm-random) close "bazzle"
+  (sm-random) end
+Differences in `diff -u' format:
+  (sm-random) begin
+  (sm-random) create "bazzle"
+  (sm-random) open "bazzle"
+  (sm-random) write "bazzle" in random order
+- (sm-random) read "bazzle" in random order
+- (sm-random) close "bazzle"
+- (sm-random) end
+
+(Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/filesys/base/sm-seq-block -a sm-seq-block -- -q  -f run sm-seq-block < /dev/null 2> tests/filesys/base/sm-seq-block.errors > tests/filesys/base/sm-seq-block.output
 perl -I../.. ../../tests/filesys/base/sm-seq-block.ck tests/filesys/base/sm-seq-block tests/filesys/base/sm-seq-block.result
-pass tests/filesys/base/sm-seq-block
+FAIL tests/filesys/base/sm-seq-block
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (sm-seq-block) begin
+  (sm-seq-block) create "noodle"
+  (sm-seq-block) open "noodle"
+  (sm-seq-block) writing "noodle"
+  (sm-seq-block) close "noodle"
+  (sm-seq-block) open "noodle" for verification
+  (sm-seq-block) verified contents of "noodle"
+  (sm-seq-block) close "noodle"
+  (sm-seq-block) end
+Differences in `diff -u' format:
+  (sm-seq-block) begin
+  (sm-seq-block) create "noodle"
+  (sm-seq-block) open "noodle"
+  (sm-seq-block) writing "noodle"
+- (sm-seq-block) close "noodle"
+- (sm-seq-block) open "noodle" for verification
+- (sm-seq-block) verified contents of "noodle"
+- (sm-seq-block) close "noodle"
+- (sm-seq-block) end
+
+(Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 5 --qemu  --filesys-size=2 -p tests/filesys/base/sm-seq-random -a sm-seq-random -- -q  -f run sm-seq-random < /dev/null 2> tests/filesys/base/sm-seq-random.errors > tests/filesys/base/sm-seq-random.output
 perl -I../.. ../../tests/filesys/base/sm-seq-random.ck tests/filesys/base/sm-seq-random tests/filesys/base/sm-seq-random.result
-pass tests/filesys/base/sm-seq-random
+FAIL tests/filesys/base/sm-seq-random
+Test output failed to match any acceptable form.
+
+Acceptable output:
+  (sm-seq-random) begin
+  (sm-seq-random) create "nibble"
+  (sm-seq-random) open "nibble"
+  (sm-seq-random) writing "nibble"
+  (sm-seq-random) close "nibble"
+  (sm-seq-random) open "nibble" for verification
+  (sm-seq-random) verified contents of "nibble"
+  (sm-seq-random) close "nibble"
+  (sm-seq-random) end
+Differences in `diff -u' format:
+  (sm-seq-random) begin
+  (sm-seq-random) create "nibble"
+  (sm-seq-random) open "nibble"
+  (sm-seq-random) writing "nibble"
+- (sm-seq-random) close "nibble"
+- (sm-seq-random) open "nibble" for verification
+- (sm-seq-random) verified contents of "nibble"
+- (sm-seq-random) close "nibble"
+- (sm-seq-random) end
+
+(Process exit codes are excluded for matching purposes.)
 pintos -v -k -T 300 --qemu  --filesys-size=2 -p tests/filesys/base/syn-read -a syn-read -p tests/filesys/base/child-syn-read -a child-syn-read -- -q  -f run syn-read < /dev/null 2> tests/filesys/base/syn-read.errors > tests/filesys/base/syn-read.output
 perl -I../.. ../../tests/filesys/base/syn-read.ck tests/filesys/base/syn-read tests/filesys/base/syn-read.result
 FAIL tests/filesys/base/syn-read
@@ -333,19 +468,19 @@ pass tests/userprog/close-stdin
 pass tests/userprog/close-stdout
 pass tests/userprog/close-bad-fd
 pass tests/userprog/read-normal
-FAIL tests/userprog/read-bad-ptr
+pass tests/userprog/read-bad-ptr
 pass tests/userprog/read-boundary
 pass tests/userprog/read-zero
 pass tests/userprog/read-stdout
 pass tests/userprog/read-bad-fd
 pass tests/userprog/write-normal
-FAIL tests/userprog/write-bad-ptr
+pass tests/userprog/write-bad-ptr
 pass tests/userprog/write-boundary
 pass tests/userprog/write-zero
 pass tests/userprog/write-stdin
 pass tests/userprog/write-bad-fd
 pass tests/userprog/exec-once
-FAIL tests/userprog/exec-arg
+pass tests/userprog/exec-arg
 pass tests/userprog/exec-multiple
 FAIL tests/userprog/exec-missing
 pass tests/userprog/exec-bad-ptr
@@ -356,7 +491,7 @@ pass tests/userprog/wait-bad-pid
 pass tests/userprog/multi-recurse
 pass tests/userprog/multi-child-fd
 pass tests/userprog/rox-simple
-FAIL tests/userprog/rox-child
+pass tests/userprog/rox-child
 FAIL tests/userprog/rox-multichild
 pass tests/userprog/bad-read
 pass tests/userprog/bad-write
@@ -367,16 +502,16 @@ pass tests/userprog/bad-jump2
 FAIL tests/userprog/no-vm/multi-oom
 pass tests/filesys/base/lg-create
 pass tests/filesys/base/lg-full
-pass tests/filesys/base/lg-random
-pass tests/filesys/base/lg-seq-block
-pass tests/filesys/base/lg-seq-random
+FAIL tests/filesys/base/lg-random
+FAIL tests/filesys/base/lg-seq-block
+FAIL tests/filesys/base/lg-seq-random
 pass tests/filesys/base/sm-create
 pass tests/filesys/base/sm-full
-pass tests/filesys/base/sm-random
-pass tests/filesys/base/sm-seq-block
-pass tests/filesys/base/sm-seq-random
+FAIL tests/filesys/base/sm-random
+FAIL tests/filesys/base/sm-seq-block
+FAIL tests/filesys/base/sm-seq-random
 FAIL tests/filesys/base/syn-read
 pass tests/filesys/base/syn-remove
 FAIL tests/filesys/base/syn-write
-11 of 76 tests failed.
+13 of 76 tests failed.
 make[1]: Leaving directory `/home/os/pintos/src/userprog/build'
