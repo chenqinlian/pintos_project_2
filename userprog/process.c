@@ -168,18 +168,33 @@ process_exit (void)
       }
     }
   }
+
+/*
   for (e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next (e))
   {
-    cps = list_entry (list_prev (e), struct child_process_status, elem);
-    if(cps != NULL)
-      palloc_free_page (cps);
+    if ( e != NULL && e->prev != NULL && e->next != NULL)
+    {
+      cps = list_entry (list_prev (e), struct child_process_status, elem);
+      if(cps != NULL)
+        palloc_free_page (cps);
+    }
   }
+
+*/
+/*
   for (e = list_begin (&(cur->fd_table)); e != list_end (&(cur->fd_table)); e = list_next (e))
   {
-    fd_elem = list_entry (list_prev (e), struct fd_element, elem);
-    if(fd_elem != NULL)
-      palloc_free_page (fd_elem);
+    if( e != NULL && e->prev != NULL && e->next != NULL )
+    {
+      fd_elem = list_entry (list_prev (e), struct fd_element, elem);
+      if(fd_elem != NULL)
+      { 
+        file_close (fd_elem -> file);
+        palloc_free_page (fd_elem);
+      }
+    }
   }
+*/
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;
@@ -196,6 +211,8 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
+  if(cur -> executing_file != NULL)
+    file_close (cur -> executing_file);
   if(is_thread_ext(parent) && parent->status != THREAD_DYING)
   {
     if(tid == parent->wait_tid)
@@ -204,7 +221,6 @@ process_exit (void)
       sema_up(&(parent->wait_sema));
     }
   }
-  file_deny_write (cur -> executing_file);  
 }
 
 /* Sets up the CPU for running user code in the current
@@ -407,10 +423,9 @@ load (const char *file_name_, void (**eip) (void), void **esp)
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
-  thread_current () -> executing_file = file;
-  file_deny_write (file);
   success = true;
-
+  thread_current () -> executing_file = (filesys_open (file_name)); 
+  file_deny_write (thread_current () -> executing_file);
  done:
   /* free the file_name page for make no leak. We always arrive here. */
   palloc_free_page (file_name);

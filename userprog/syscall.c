@@ -142,7 +142,7 @@ syscall_handler (struct intr_frame *f)
       if(file != NULL)
         f->eax = file_to_new_fd (file);
       else
-        thread_exit ();
+        f->eax = -1;
       return;
      // printf("SYS_OPEN\n");
     case SYS_FILESIZE:
@@ -280,7 +280,7 @@ file_to_new_fd (struct file* file)
 {
   struct thread *cur = thread_current ();
   struct fd_element *fd_elem;
-  fd_elem = palloc_get_page (PAL_ZERO);
+  fd_elem = palloc_get_page (PAL_USER);
   if(fd_elem == NULL)
     return -1;
   fd_elem->file = file;
