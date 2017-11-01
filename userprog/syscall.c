@@ -16,11 +16,11 @@
 static void syscall_handler (struct intr_frame *);
 int file_to_new_fd (struct file *file);
 struct fd_element* fd_to_fd_element (int fd);
-
+static struct semaphore sys_sema;
 void
 syscall_init (void) 
 {
-//  sema_init (&syscall_sema, 1);
+  sema_init (&sys_sema, 1);
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
 }
 
@@ -72,10 +72,13 @@ syscall_handler (struct intr_frame *f)
   struct file *file;
   /* Number of arguments that are used depends on syscall number.
      Max number of arguments is 3. */
-  
-  if((!is_user_vaddr ((f->esp)))||(f->esp<0x08084000))
+  if((!is_user_vaddr ((f->esp))))
+  {
     thread_exit ();
+  }
   syscall_number = *(int *)(f->esp);
+  if(syscall_number == SYS_EXEC || (syscall_number >= SYS_CREATE && syscall_number <=SYS_CLOSE))
+    sema_down (&sys_sema);
   /* treat all syscall region as a critical section 
      we have to sema_up if the handler returns in the switch case
      (maybe later we make all syscalls, we may need only one sema_up in the last*/
@@ -91,7 +94,9 @@ syscall_handler (struct intr_frame *f)
       //printf("SYS_EXIT\n");
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
+      {
         thread_exit ();
+      }
       //f->eax = *(int *)argument_1;
       thread_current () -> exit_status = *(int *)argument_1;
      // sema_up (&syscall_sema);
@@ -101,16 +106,25 @@ syscall_handler (struct intr_frame *f)
       //printf("SYS_EXEC\n");
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       if(!is_valid_string(*(char **)argument_1))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       f->eax = process_execute (*(char **)argument_1);
      // sema_up (&syscall_sema);
+      sema_up (&sys_sema);
       return;
     case SYS_WAIT:
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
+      {
         thread_exit ();
+      }
       f->eax = process_wait (*(tid_t *) argument_1); 
       return;
     case SYS_CREATE:
@@ -118,45 +132,71 @@ syscall_handler (struct intr_frame *f)
       argument_1 = (f->esp)+4;
       argument_2 = (f->esp)+8; 
       if(!is_user_vaddr ((f->esp)+8))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       if(!is_valid_string(*(char **)argument_1))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       f->eax = filesys_create(*(char **)argument_1, *(off_t *)argument_2); 
+      sema_up (&sys_sema);
       return;
     case SYS_REMOVE:
      // printf("SYS_REMOVE\n");
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       if(!is_valid_string(*(char **)argument_1))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       f->eax = filesys_remove (*(char **)argument_1);
+      sema_up (&sys_sema);
       return;
     case SYS_OPEN:
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       if(!is_valid_string(*(char **)argument_1))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       file = filesys_open (*(char **)argument_1);
       if(file != NULL)
         f->eax = file_to_new_fd (file);
       else
         f->eax = -1;
+      sema_up (&sys_sema);
       return;
      // printf("SYS_OPEN\n");
     case SYS_FILESIZE:
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       fd_elem = fd_to_fd_element (*(int *)argument_1);
       if(fd_elem == NULL)
       {
         f->eax = -1;
+        sema_up (&sys_sema);
         return;
       }
       file = fd_elem->file;
       f->eax = file_length (file);
+      sema_up (&sys_sema);
       return;
       //printf("SYS_FILESIZE\n");
     case SYS_READ:
@@ -165,26 +205,33 @@ syscall_handler (struct intr_frame *f)
       argument_2 = (f->esp)+8;
       argument_3 = (f->esp)+12;
       if(!is_user_vaddr ((f->esp)+12))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       if (*(int *)argument_1 == STDIN_FILENO)
       {
         input_getc();
         f->eax = 1;
+        sema_up (&sys_sema);
         return;
       }
       fd_elem = fd_to_fd_element (*(int *)argument_1);
       if(fd_elem == NULL)
       {
         f->eax = -1;
+        sema_up (&sys_sema);
         return;
       }
       file = fd_elem -> file;
       if(file == NULL)
       {
         f->eax = -1;
+        sema_up (&sys_sema);
         return;
       }
       f->eax = file_read (file, *(void **)argument_2, *(off_t *)argument_3);
+      sema_up (&sys_sema);
       return;
     case SYS_WRITE:
      // printf("SYS_WRITE\n");
@@ -192,7 +239,10 @@ syscall_handler (struct intr_frame *f)
       argument_2 = (f->esp)+8;
       argument_3 = (f->esp)+12;
       if(!is_user_vaddr ((f->esp)+12))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       if(*(int *)argument_1 == STDOUT_FILENO)
       {
       /* Fd 1 writes to the console. 
@@ -212,55 +262,77 @@ syscall_handler (struct intr_frame *f)
         if (fd_elem == NULL)
         {
           f->eax = -1;
+          sema_up (&sys_sema);
           return;
         }
         file = fd_elem -> file;
         if (file == NULL)
         {
           f->eax = -1;
+          sema_up (&sys_sema);
           return;
         }
         f->eax = file_write (file, *(void **)argument_2, *(off_t *)argument_3); 
       }
+      sema_up (&sys_sema);
       return;
     case SYS_SEEK:
      // printf("SYS_SEEK\n");
       argument_1 = (f->esp)+4;
       argument_2 = (f->esp)+8;
       if(!is_user_vaddr ((f->esp)+8))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       fd_elem = fd_to_fd_element (*(int *)argument_1);
       if(fd_elem == NULL)
+      {
+        sema_up (&sys_sema);
         return;
+      }
       file = fd_elem -> file;
       if(file == NULL)
+      {
+        sema_up (&sys_sema);
         return;
+      }
       file_seek (file, *(off_t *)argument_2);
+      sema_up (&sys_sema);
       return;
     case SYS_TELL:
      // printf("SYS_TELL\n");
       if(!is_user_vaddr ((f->esp)+4))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       argument_1 = (f->esp)+4;
       fd_elem = fd_to_fd_element (*(int *)argument_1);
       if(fd_elem == NULL)
       {
         f->eax = -1;
+        sema_up (&sys_sema);
         return;
       }
       file = fd_elem->file;
       if(file == NULL)
       {
         f->eax = -1;
+        sema_up (&sys_sema);
         return;
       }
       f->eax = file_tell (file);
+      sema_up (&sys_sema);
       return;
     case SYS_CLOSE:
      // printf("SYS_CLOSE\n");
       argument_1 = (f->esp)+4;
       if(!is_user_vaddr ((f->esp)+4))
+      {
+        sema_up (&sys_sema);
         thread_exit ();
+      }
       struct fd_element* fd_elem = fd_to_fd_element (*(int *)argument_1);
       if(fd_elem != NULL)
       {
@@ -268,6 +340,7 @@ syscall_handler (struct intr_frame *f)
         list_remove (&fd_elem->elem);
         palloc_free_page (fd_elem);
       }
+      sema_up (&sys_sema);
       return;
   }
   /* treat all syscall region as a critical section */
