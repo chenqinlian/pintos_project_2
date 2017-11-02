@@ -117,25 +117,28 @@ process_wait (tid_t child_tid)
   struct child_process_status *cps;
   struct thread *cur = thread_current ();
   struct list_elem *e;
+  int exit_status;
  
   for(e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next (e))
   {
     cps = list_entry (e, struct child_process_status, elem);
     if(cps->tid == child_tid)
     {
-      if(cps->waited)
-        return -1;
       if(cps->exited)
       {
-        cps->waited = true;
-        return cps->exit_status;
+        exit_status = cps->exit_status;
+        list_remove (e);
+        palloc_free_page (cps);
+        return exit_status;
       }
       else
       {
         cur->wait_tid = child_tid;
         sema_down (&(cur->wait_sema));
-        cps->waited=true;
-        return cps->exit_status;
+        exit_status = cps->exit_status;
+        list_remove (e);
+        palloc_free_page (cps);
+        return exit_status;
       }
     }
   }
@@ -184,7 +187,7 @@ process_exit (void)
         palloc_free_page (cps);
     }
   }*/
-e = list_begin (&cur->fd_table);
+  e = list_begin (&cur->fd_table);
   while(!is_tail(e))
   {
     fd_elem = list_entry (e, struct fd_element, elem);
