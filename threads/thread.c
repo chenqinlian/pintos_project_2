@@ -201,6 +201,7 @@ thread_create (const char *name, int priority,
   cps -> waited = false;
   cps -> exit_status = 0;
   cps -> thread_ptr = t;
+  t -> parent_thread = thread_current ();
   list_push_back(&(thread_current ()->child_process_status_list), &(cps->elem));
   #endif
 
@@ -507,7 +508,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->next_fd = 2;
   t->executing_file = NULL;
   sema_init (&t->exec_sema, 0);
-  sema_init (&t->parent_sema, 0);
   #endif
 }
 

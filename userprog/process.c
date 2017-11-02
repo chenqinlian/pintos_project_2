@@ -22,6 +22,11 @@
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
 
+static inline bool
+is_tail (struct list_elem *elem)
+{
+  return elem != NULL && elem->prev != NULL && elem->next == NULL;
+}
 
 /* arguments parsing and passing to process */
 void arguments_to_stack (char *file_name, void **esp);
@@ -36,9 +41,7 @@ process_execute (const char *file_name)
   char *fn_copy;
   tid_t tid;
   char *save_ptr=NULL;
-  struct list_elem *e;
   struct thread *cur;
-  struct child_process_status *cps;
   cur = thread_current ();
   /* Make a copy of FILE_NAME.
      Otherwise there's a race between the caller and load(). */
@@ -51,22 +54,12 @@ process_execute (const char *file_name)
   file_name = strtok_r (file_name, " ", &save_ptr);
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
-  if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
-  else
-  {
-    for (e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next(e))
-    {
-      cps = list_entry(e, struct child_process_status, elem);
-      if(cps->tid == tid)
-      {
-        cps->thread_ptr->parent_thread = cur;
-        sema_up(&(cps->thread_ptr->parent_sema));
-        break;
-      }
-    }
-  }
   sema_down(&(cur->exec_sema));
+  if(tid == TID_ERROR)
+  {
+    palloc_free_page (fn_copy);
+    return TID_ERROR;
+  }
   if(!cur->exec_child_success)
     return TID_ERROR;
   return tid;
@@ -86,7 +79,6 @@ start_process (void *file_name_)
   if_.gs = if_.fs = if_.es = if_.ds = if_.ss = SEL_UDSEG;
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
-  sema_down (&(thread_current () -> parent_sema));
   success = load (file_name, &if_.eip, &if_.esp);
   thread_current () -> parent_thread -> exec_child_success = success;
   sema_up (&(thread_current () -> parent_thread -> exec_sema));
@@ -161,6 +153,7 @@ process_exit (void)
   tid_t tid = cur -> tid;
   /* change values in parent's list. */
   struct child_process_status *cps;
+  struct fd_element *fd_elem;
   struct list_elem *e;
   printf("%s: exit(%d)\n", cur->name, exit_status);
   if(is_thread_ext (parent) && parent->status != THREAD_DYING)
@@ -175,33 +168,49 @@ process_exit (void)
       }
     }
   }
-
-/*
-  for (e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next (e))
+  e = list_begin (&cur->child_process_status_list);
+  while(!is_tail(e))
+  {
+    cps = list_entry (e, struct child_process_status, elem);
+    e = list_remove(e);
+    palloc_free_page (cps);
+  }
+/*  for (e = list_begin (&(cur->child_process_status_list)); e != list_end (&(cur->child_process_status_list)); e = list_next (e))
   {
     if ( e != NULL && e->prev != NULL && e->next != NULL)
     {
-      cps = list_entry (list_prev (e), struct child_process_status, elem);
+      cps = list_entry (e, struct child_process_status, elem);
       if(cps != NULL)
         palloc_free_page (cps);
     }
+  }*/
+e = list_begin (&cur->fd_table);
+  while(!is_tail(e))
+  {
+    fd_elem = list_entry (e, struct fd_element, elem);
+    e = list_remove (e);
+    file_close(fd_elem->file);
+    palloc_free_page (fd_elem);
   }
-
-*/
 /*
   for (e = list_begin (&(cur->fd_table)); e != list_end (&(cur->fd_table)); e = list_next (e))
   {
+printf("before first if\n");
     if( e != NULL && e->prev != NULL && e->next != NULL )
     {
-      fd_elem = list_entry (list_prev (e), struct fd_element, elem);
+printf("before second if\n");
+      fd_elem = list_entry (e, struct fd_element, elem);
+printf("fd eleme list entry \n");
       if(fd_elem != NULL)
-      { 
+      {
+printf("before file \n"); 
         file_close (fd_elem -> file);
+ printf("fileclose oo\n");
         palloc_free_page (fd_elem);
+printf("palloc free oo\n");
       }
     }
-  }
-*/
+  }*/
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
   pd = cur->pagedir;

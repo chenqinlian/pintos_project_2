@@ -111,7 +111,6 @@ struct thread
     struct file* executing_file;        /* to deny and allow write executing file */
     struct semaphore exec_sema;         /* used for waiting child's process start. */
     bool exec_child_success;            /* child process exec's result */
-    struct semaphore parent_sema;       /* wait for parent_thread pointer sets */
   #endif
 
 
