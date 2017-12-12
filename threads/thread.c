@@ -28,6 +28,8 @@ static struct list ready_list;
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+static struct list sleep_list;
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -71,6 +73,51 @@ static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+bool
+sleep_list_less_func (const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+  struct thread *thread_a = list_entry(a, struct thread, slpelem);
+  struct thread *thread_b = list_entry(b, struct thread, slpelem);
+
+  return (thread_a->alarm < thread_b->alarm) || (thread_a->alarm == thread_b->alarm && thread_a->priority > thread_b->priority);
+}
+
+void
+thread_sleep (int64_t new_alarm)
+{
+  struct thread *cur = thread_current ();
+  enum intr_level old_level = intr_disable ();
+
+  cur->alarm = new_alarm;
+  list_insert_ordered(&sleep_list, &cur->slpelem, sleep_list_less_func, NULL);
+  thread_block ();
+  intr_set_level(old_level);
+}
+
+int64_t thread_wake (int64_t current_time)
+{
+  struct list_elem *e;
+  struct list_elem *last = list_end(&sleep_list);
+  for (e = list_begin(&sleep_list); e != last; e = list_next(e))
+  {
+    struct thread *t = list_entry (e, struct thread, slpelem);
+    if (t->alarm <= current_time)
+    {
+      thread_unblock(t);
+      list_pop_front (&sleep_list);
+      intr_yield_on_return();
+    }
+    else
+      break;
+  }
+
+  if(e == last)
+    return MAX_TIMER;
+  else
+    return list_entry (e, struct thread, slpelem)->alarm;
+}
+
+
 /* to use is_thread in userprog */
 bool is_thread_ext (struct thread *);
 
@@ -95,6 +142,7 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  list_init (&sleep_list);
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
@@ -336,8 +384,8 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+  if (cur != idle_thread)
+    list_push_back (&ready_list, &cur->elem); 
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -620,6 +668,9 @@ allocate_tid (void)
 
   return tid;
 }
+
+
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
